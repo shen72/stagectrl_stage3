@@ -1,51 +1,157 @@
-/////////////////////////////////
-// File: basic.cc
-// Desc: minimal controller example
-// Created: 2011.10.19
-// Author: Richard Vaughan <vaughan@sfu.ca>
-// License: GPL
-/////////////////////////////////
+// Arkapravo Bhaumik (arkapravobhaumik at gmail dot com) 
+// 23 January 2012
+// This is a modification Dr.Vaughan's work available at http://github.com/rtv/stagectrl
+// Modified to work on Stage 3.X.X, Tested on Stage 3.2.2, Ubuntu 10.04 LTS
 
 #include "stage.hh"
 using namespace Stg;
 
-static ModelPosition* position(NULL);
+const double cruisespeed = 0.4; //initial value was 0.4
+const double avoidspeed = 0.05; //initial value was 0.05
+const double avoidturn = 0.5; //initial value was 0.5
+const double minfrontdistance = 1.0; // 0.6  
+const bool verbose = false;
+const double stopdist = 0.3; 
+const int avoidduration = 10;
 
-/** this is added as a callback to a ranger model, and is called
-    whenever the model is updated by Stage. 
-*/
-int RangerUpdateCb( ModelRanger* mod, void* dummy)
-{  	
-  const std::vector<ModelRanger::Sensor>& sensors = mod->GetSensors();
+typedef struct
+{
+  ModelPosition* pos;
+  ModelLaser* laser;
+  int avoidcount, randcount;
+} robot_t;
+
+int LaserUpdate( Model* mod, robot_t* robot );
+int PositionUpdate( Model* mod, robot_t* robot );
+
+// Stage calls this when the model starts up
+extern "C" int Init( Model* mod, CtrlArgs* args )
+{
+  // local arguments
+	/*  printf( "\nWander controller initialised with:\n"
+			"\tworldfile string \"%s\"\n" 
+			"\tcmdline string \"%s\"",
+			args->worldfile.c_str(),
+			args->cmdline.c_str() );
+	*/
+
+  robot_t* robot = new robot_t;
+ 
+  robot->avoidcount = 0;
+  robot->randcount = 0;
   
-  // ( inspect the ranger data and decide what to do )
+  robot->pos = (ModelPosition*)mod;
+  robot->laser = (ModelLaser*)mod->GetChild( "laser:0" );
+  robot->laser->AddUpdateCallback( (stg_model_callback_t)LaserUpdate, robot );
   
-  // output something to prove it is working  
-  printf( "Hello simulated world\n" ); // console
-  mod->Say( "Hello" ); // GUI window
-  position->SetSpeed( 0.4, 0, 0.1 );  // output a speed command (X, Y, Z)
+  robot->laser->Subscribe(); // starts the laser updates
+  robot->pos->Subscribe(); // starts the position updates
+    
+  return 0; //ok
+}
+
+
+// inspect the laser data and decide what to do
+int LaserUpdate( Model* mod, robot_t* robot )
+{
+  // get the data
+  uint32_t sample_count=0;
+	ModelLaser::Sample* scan = robot->laser->GetSamples( &sample_count );
+  if( ! scan )
+    return 0;
+  
+  bool obstruction = false;
+  bool stop = false;
+
+  // find the closest distance to the left and right and check if
+  // there's anything in front
+  double minleft = 1e6;
+  double minright = 1e6;
+
+  for (uint32_t i = 0; i < sample_count; i++)
+    {
+
+		if( verbose ) printf( "%.3f ", scan[i].range );
+
+      if( (i > (sample_count/3)) 
+			 && (i < (sample_count - (sample_count/3))) 
+			 && scan[i].range < minfrontdistance)
+		  {
+			 if( verbose ) puts( "  obstruction!" );
+			 obstruction = true;
+		  }
+		
+      if( scan[i].range < stopdist )
+		  {
+			 if( verbose ) puts( "  stopping!" );
+			 stop = true;
+		  }
+      
+      if( i > sample_count/2 )
+				minleft = std::min( minleft, scan[i].range );
+      else      
+				minright = std::min( minright, scan[i].range );
+    }
+  
+  if( verbose ) 
+	 {
+		puts( "" );
+		printf( "minleft %.3f \n", minleft );
+		printf( "minright %.3f\n ", minright );
+	 }
+
+  if( obstruction || stop || (robot->avoidcount>0) )
+    {
+      if( verbose ) printf( "Avoid %d\n", robot->avoidcount );
+	  		
+      robot->pos->SetXSpeed( stop ? 0.0 : avoidspeed );      
+      
+      /* once we start avoiding, select a turn direction and stick
+	 with it for a few iterations */
+      if( robot->avoidcount < 1 )
+        {
+			 if( verbose ) puts( "Avoid START" );
+          robot->avoidcount = random() % avoidduration + avoidduration;
+			 
+			 if( minleft < minright  )
+				{
+				  robot->pos->SetTurnSpeed( -avoidturn );
+				  if( verbose ) printf( "turning right %.2f\n", -avoidturn );
+				}
+			 else
+				{
+				  robot->pos->SetTurnSpeed( +avoidturn );
+				  if( verbose ) printf( "turning left %2f\n", +avoidturn );
+				}
+        }
+		
+      robot->avoidcount--;
+    }
+  else
+    {
+      if( verbose ) puts( "Cruise" );
+
+      robot->avoidcount = 0;
+      robot->pos->SetXSpeed( cruisespeed );	  
+		robot->pos->SetTurnSpeed(  0 );
+    }
+
+ //  if( robot->pos->Stalled() )
+// 	 {
+// 		robot->pos->SetSpeed( 0,0,0 );
+// 		robot->pos->SetTurnSpeed( 0 );
+// 	 }
+    
   return 0;
 }
 
-/** Stage calls this when the model starts up 
- */
-extern "C" int Init( Model* mod )
+int PositionUpdate( Model* mod, robot_t* robot )
 {
-  // the controller is attached to a position model, so Init is called
-  // with a pointer to this model.
-  position = (ModelPosition*)mod;
-  position->Subscribe(); // models are only updated if someone is subscribed to them
+  Pose pose = robot->pos->GetPose();
 
-  // we obtain a pointer to the first unused ranger that is a child of this position model
-  ModelRanger* ranger = (ModelRanger*) mod->GetUnusedModelOfType( "ranger" );
+  printf( "Pose: [%.2f %.2f %.2f %.2f]\n",
+	  pose.x, pose.y, pose.z, pose.a );
 
-  // install a callback function that will be called every time the
-  // ranger model is updated by the simulator
-  ranger->AddCallback( Model::CB_UPDATE, (model_callback_t)RangerUpdateCb, NULL );
-  ranger->Subscribe(); // models are only updated if someone is subscribed to them
-
-  
-  return 0; //ok
+  return 0; // run again
 }
- 
 

@@ -1,3 +1,8 @@
+# Arkapravo Bhaumik (arkapravobhaumik at gmail dot com) 
+# 23 January 2012
+# This is a modification Dr.Vaughan's work available at http://github.com/rtv/stagectrl
+# Modified to work on Stage 3.X.X, Tested on Stage 3.2.2, Ubuntu 10.04 LTS
+
 # simple.world - basic world file example
 # Authors: Richard Vaughan
 # $Id$
@@ -7,14 +12,14 @@ paused 0
 # configure the GUI window
 window
 (
-  size [ 1258.000 962.000 ] # in pixels
-  scale 19.361            
-  center [ -6.229  -10.901 ]
+  size [ 640.000 480.000 ] # in pixels
+  scale 20         
+  center [ 1  1 ]
   rotate [ 0  0 ]
 )
 
 position( 
   pose [ 0 0 0 0 ]
-  ranger()
+  laser()
   ctrl "basic"
 )
