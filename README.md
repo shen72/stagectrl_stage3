@@ -1,9 +1,9 @@
 stagectrl_stage3
 ================
 
-Template for writing controllers for Stage 3.X.X (http://sourceforge.net/projects/playerstage/files/Stage/). This is a modification of Dr.Vaughan's work for stage 4.X.X (https://github.com/rtv/Stage) available at http://github.com/rtv/stagectrl
+Template for writing controllers for Stage 3.X.X (http://sourceforge.net/projects/playerstage/files/Stage/). This is a modification of Dr.Vaughan's work for Stage 4.X.X (https://github.com/rtv/Stage) available at http://github.com/rtv/stagectrl
 
-Tested on Stage 3.2.2, Ubuntu 10.04 LTS
+Tested on Stage 3.2.2 installed on Ubuntu 10.04 LTS
 
 stagectrl README
 ------------------------
