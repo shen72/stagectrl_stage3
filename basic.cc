@@ -3,23 +3,25 @@
 // This is a modification of Dr.Vaughan's work available at http://github.com/rtv/stagectrl
 // Modified to work on Stage 3.X.X, Tested on Stage 3.2.2, Ubuntu 10.04 LTS
 
-#include "stage.hh"
+#include <stage.hh>
+#include <vector>
+
 using namespace Stg;
 
 const double cruisespeed = 0.4; //initial value was 0.4
 const double avoidspeed = 0.05; //initial value was 0.05
 const double avoidturn = 0.5; //initial value was 0.5
 const double minfrontdistance = 1.0; // 0.6  
-const bool verbose = false;
+const bool verbose = true;
 const double stopdist = 0.3; 
 const int avoidduration = 10;
 
-typedef struct
+struct robot_t
 {
   ModelPosition* pos;
-  ModelLaser* laser;
+  ModelRanger* ranger;
   int avoidcount, randcount;
-} robot_t;
+};
 
 int LaserUpdate( Model* mod, robot_t* robot );
 int PositionUpdate( Model* mod, robot_t* robot );
@@ -34,6 +36,7 @@ extern "C" int Init( Model* mod, CtrlArgs* args )
 			args->worldfile.c_str(),
 			args->cmdline.c_str() );
 	*/
+  puts("Init.");
 
   robot_t* robot = new robot_t;
  
@@ -41,10 +44,11 @@ extern "C" int Init( Model* mod, CtrlArgs* args )
   robot->randcount = 0;
   
   robot->pos = (ModelPosition*)mod;
-  robot->laser = (ModelLaser*)mod->GetChild( "laser:0" );
-  robot->laser->AddUpdateCallback( (stg_model_callback_t)LaserUpdate, robot );
+  robot->ranger = (ModelRanger*)mod->GetChild( "ranger:0" );
+  robot->ranger->AddCallback(
+      Model::CB_UPDATE, (model_callback_t)LaserUpdate, robot );
   
-  robot->laser->Subscribe(); // starts the laser updates
+  robot->ranger->Subscribe(); // starts the laser updates
   robot->pos->Subscribe(); // starts the position updates
     
   return 0; //ok
@@ -54,12 +58,16 @@ extern "C" int Init( Model* mod, CtrlArgs* args )
 // inspect the laser data and decide what to do
 int LaserUpdate( Model* mod, robot_t* robot )
 {
-  // get the data
-  uint32_t sample_count=0;
-	ModelLaser::Sample* scan = robot->laser->GetSamples( &sample_count );
-  if( ! scan )
+  // Only look at the sensor 0.
+  const auto& sensors = robot->ranger->GetSensors();
+  if (sensors.size() == 0) {
+    puts("sensor not found.");
     return 0;
-  
+  }
+  const auto& sensor = sensors[0]; 
+  // get the data
+  uint32_t sample_count = sensor.ranges.size();
+ 
   bool obstruction = false;
   bool stop = false;
 
@@ -71,26 +79,26 @@ int LaserUpdate( Model* mod, robot_t* robot )
   for (uint32_t i = 0; i < sample_count; i++)
     {
 
-		if( verbose ) printf( "%.3f ", scan[i].range );
+		if( verbose ) printf( "%.3f ", sensor.ranges[i] );
 
       if( (i > (sample_count/3)) 
 			 && (i < (sample_count - (sample_count/3))) 
-			 && scan[i].range < minfrontdistance)
+			 && sensor.ranges[i] < minfrontdistance)
 		  {
 			 if( verbose ) puts( "  obstruction!" );
 			 obstruction = true;
 		  }
 		
-      if( scan[i].range < stopdist )
+      if( sensor.ranges[i] < stopdist )
 		  {
 			 if( verbose ) puts( "  stopping!" );
 			 stop = true;
 		  }
       
       if( i > sample_count/2 )
-				minleft = std::min( minleft, scan[i].range );
+				minleft = std::min( minleft, sensor.ranges[i] );
       else      
-				minright = std::min( minright, scan[i].range );
+				minright = std::min( minright, sensor.ranges[i] );
     }
   
   if( verbose ) 
@@ -133,7 +141,7 @@ int LaserUpdate( Model* mod, robot_t* robot )
 
       robot->avoidcount = 0;
       robot->pos->SetXSpeed( cruisespeed );	  
-		robot->pos->SetTurnSpeed(  0 );
+      robot->pos->SetTurnSpeed(  0 );
     }
 
  //  if( robot->pos->Stalled() )
