@@ -48,5 +48,5 @@ position(
       samples 100
     )
   )
-  ctrl "basic"
+  ctrl "libbasic"
 )

@@ -4,8 +4,6 @@ find_package(catkin REQUIRED)
 find_package(stage REQUIRED)
 
 set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS}")
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 message(WARNING "stage include dir:" ${STAGE_INCLUDE_DIRS})
 message(WARNING "stage link dir: " ${STAGE_LIBRARIES})
@@ -15,4 +13,5 @@ link_directories("/opt/ros/kinetic/lib")
 catkin_package(CATKIN_DEPENDS roscpp std_msgs) 
 
 add_library(basic basic.cc)
-target_link_libraries(basic stage)
+set_target_properties(basic
+  PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR} )

@@ -1,0 +1,20 @@
+<package format="2">
+  <name>stagectrl_stage3</name>
+  <version>1.0.0</version>
+  <description>
+     stage_controllers
+  </description>
+  <maintainer email="shen72@gmail.com">Yi Shen</maintainer>
+  <license>BSD</license>
+  <url>http://ros.org/wiki/stage_controllers</url>
+  <buildtool_depend>catkin</buildtool_depend>
+ 
+  <build_depend>roscpp</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>stage</build_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>stage</exec_depend>
+</package>
+
+
